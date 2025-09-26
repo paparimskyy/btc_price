@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Курс Биткоина</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #f7931a;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .price-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .price-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .price-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .currency {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .price {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #f7931a;
+        }
+        
+        .change {
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .positive {
+            color: #28a745;
+        }
+        
+        .negative {
+            color: #dc3545;
+        }
+        
+        .chart-container {
+            margin: 40px 0;
+            position: relative;
+            height: 400px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .chart-title {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+        
+        .last-updated {
+            text-align: center;
+            color: #6c757d;
+            margin-top: 30px;
+            font-size: 0.9em;
+        }
+        
+        .refresh-btn {
+            background: #f7931a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: #e5840f;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 20px;
+        }
+        
+        .buttons-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .info-text {
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Текущий курс Биткоина (BTC)</h1>
+        
+        <div class="price-grid">
+            {% for currency, data in bitcoin_data.items() %}
+            <div class="price-card">
+                <div class="currency">{{ currency }}</div>
+                <div class="price">{{ data.price }}</div>
+                <div class="change {{ data.change_class }}">
+                    24h: {{ data.change_24h }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- График -->
+        <div class="chart-container">
+            <div class="chart-title">График курса BTC/USD за последние 30 дней</div>
+            <canvas id="priceChart"></canvas>
+            <div id="chartLoading" class="loading">Загрузка графика...</div>
+        </div>
+        
+        <div class="info-text">
+            Данные обновляются в реальном времени с CoinGecko API
+        </div>
+        
+        <div class="buttons-container">
+            <button class="refresh-btn" onclick="location.reload()">
+                Обновить все данные
+            </button>
+            <button class="refresh-btn" onclick="loadChart()">
+                Обновить только график
+            </button>
+        </div>
+        
+        <div class="last-updated">
+            Последнее обновление: {{ last_updated }}
+        </div>
+    </div>
+
+    <script>
+
+        const chartLabels = {{ chart_labels | tojson | safe }};
+        const chartPrices = {{ chart_prices | tojson | safe }};
+        
+
+        document.addEventListener('DOMContentLoaded', function() {
+         
+            if (chartLabels && chartPrices && chartLabels.length > 0 && chartPrices.length > 0) {
+                createChart(chartLabels, chartPrices);
+                document.getElementById('chartLoading').style.display = 'none';
+            } else {
+                document.getElementById('chartLoading').innerHTML = 
+                    'Ошибка загрузки данных графика. Попробуйте обновить страницу.';
+            }
+        });
+        
+        function createChart(labels, prices) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+
+            const numericPrices = prices.map(price => Number(price));
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Цена BTC/USD',
+                        data: numericPrices,
+                        borderColor: '#f7931a',
+                        backgroundColor: 'rgba(247, 147, 26, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#f7931a',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Цена: $' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            },
+                            ticks: {
+                                maxTicksLimit: 8
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+        
+  
+        function loadChart() {
+            document.getElementById('chartLoading').style.display = 'block';
+            document.getElementById('chartLoading').innerHTML = 'Загрузка новых данных...';
+            
+            fetch('/api/history')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const labels = data.data.map(item => item.date);
+                        const prices = data.data.map(item => item.price);
+                        
+               
+                        const oldChart = Chart.getChart('priceChart');
+                        if (oldChart) {
+                            oldChart.destroy();
+                        }
+                        
+                        createChart(labels, prices);
+                        document.getElementById('chartLoading').style.display = 'none';
+                    } else {
+                        document.getElementById('chartLoading').innerHTML = 
+                            'Ошибка загрузки данных. Попробуйте еще раз.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    document.getElementById('chartLoading').innerHTML = 
+                        'Ошибка загрузки данных. Проверьте соединение с интернетом.';
+                });
+        }
+    </script>
+</body>
+</html>
